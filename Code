@@ -1,0 +1,220 @@
+!pip install rdkit-pypi
+!pip install rdkit
+!pip install scikit-learn
+
+from rdkit import Chem, DataStructs
+from rdkit.Chem import AllChem, Descriptors
+
+from rdkit.Chem.Draw import IPythonConsole
+from rdkit.Chem import Draw
+IPythonConsole.ipython_useSVG=True
+
+import numpy as np
+import joblib
+import os
+import zipfile
+import pandas as pd
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import cross_val_score
+from sklearn.feature_selection import RFE
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import accuracy_score, cohen_kappa_score, matthews_corrcoef
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from google.colab import files
+uploaded = files.upload()
+
+zip_path = list(uploaded.keys())[0]
+extract_path = "/content/extracted_files"
+with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+    zip_ref.extractall(extract_path)
+
+print(f"Extracted to {extract_path}")
+
+df = pd.read_csv('/content/extracted_files/train_rows.csv')
+df
+
+features = df.drop('Class', axis=1)
+
+correlation_matrix = features.corr()
+
+plt.figure(figsize=(20, 10))
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.5)
+plt.title('Correlation Heatmap')
+plt.show()
+
+X = df.drop('Class', axis=1)
+y = df['Class']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+#RANDOM FOREST
+model = RandomForestClassifier()
+
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Accuracy: {accuracy}")
+
+plt.scatter(y_test, y_pred)
+plt.xlabel('Given Values')
+plt.ylabel('Predicted Values')
+plt.title('Given vs Predicted Values')
+plt.show()
+
+cm = confusion_matrix(y_test, y_pred)
+
+sns.heatmap(cm, annot=True, cmap='Blues')
+plt.xlabel('Predicted Class')
+plt.ylabel('Actual Class')
+plt.title('Confusion Matrix')
+plt.show()
+
+df_test = pd.read_csv('/content/extracted_files/test_rows.csv')
+df_test
+additional_predictions_rf = model.predict(df_test)
+
+print(additional_predictions_rf)
+
+known_values = pd.read_csv('/content/extracted_files/test_rows_labels.csv')
+class_column = known_values['Class']
+class_column
+
+correct_predictions = 0
+for pred, known in zip(additional_predictions_rf, class_column):
+    if pred == known:
+        correct_predictions += 1
+
+accuracy = correct_predictions / len(known_values)
+print(f"Accuracy: {accuracy}")
+
+#SVM 
+svc_model = SVC()
+
+svc_model.fit(X_train, y_train)
+
+predictions = svc_model.predict(X_test)
+
+accuracy = accuracy_score(y_test, predictions)
+print(f"Accuracy: {accuracy}")
+
+additional_predictions_svc = svc_model.predict(df_test)
+
+print(additional_predictions_svc)
+
+correct_predictions = 0
+for pred, known in zip(additional_predictions_svc, class_column):
+    if pred == known:
+        correct_predictions += 1
+
+
+accuracy = correct_predictions / len(known_values)
+print(f"Accuracy: {accuracy}")
+
+classifiers = [
+    ('Random Forest', RandomForestClassifier()),
+    ('Support Vector Machine', SVC())
+]
+
+accuracy_10fold = []
+accuracy_5fold = []
+
+for classifier_name, classifier in classifiers:
+    scores_10fold = cross_val_score(classifier, X, y, cv=10)
+    scores_5fold = cross_val_score(classifier, X, y, cv=5)
+    print(f"{classifier_name}: Accuracy_10fold = {scores_10fold.mean()}: Accuracy_5fold = {scores_5fold.mean()}")
+
+correlation_matrix = df.corr()
+correlation_with_target = correlation_matrix['Class'].abs().sort_values(ascending=False)
+best_columns = correlation_with_target[1:22].index.tolist()
+
+classifier = RandomForestClassifier()
+
+rfe = RFE(estimator=classifier, n_features_to_select=21)
+rfe.fit(X, y)
+
+best_columns_RF = X.columns[rfe.support_].tolist()
+
+from sklearn.feature_selection import SelectKBest, f_classif
+
+selector = SelectKBest(score_func=f_classif, k=21)
+selector.fit(X, y)
+best_columns_K = X.columns[selector.get_support()].tolist()
+
+X_train, X_test, y_train, y_test = train_test_split(df[best_columns], df['Class'], test_size=0.2, random_state=42)
+
+model = RandomForestClassifier()
+
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+
+accuracy = accuracy_score(y_test, y_pred)
+print("Accuracy:", accuracy)
+
+X_train, X_test, y_train, y_test = train_test_split(df[best_columns_RF], df['Class'], test_size=0.2, random_state=42)
+
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+
+accuracy = accuracy_score(y_test, y_pred)
+print("Accuracy:", accuracy)
+
+X_train, X_test, y_train, y_test = train_test_split(df[best_columns_K], df['Class'], test_size=0.2, random_state=42)
+
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+
+accuracy = accuracy_score(y_test, y_pred)
+print("Accuracy:", accuracy)
+
+X_train, X_test, y_train, y_test = train_test_split(df[best_columns], df['Class'], test_size=0.2, random_state=42)
+
+model = SVC()
+
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+
+accuracy = accuracy_score(y_test, y_pred)
+print("Accuracy:", accuracy)
+X_train, X_test, y_train, y_test = train_test_split(df[best_columns_RF], df['Class'], test_size=0.2, random_state=42)
+
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+
+accuracy = accuracy_score(y_test, y_pred)
+print("Accuracy:", accuracy)
+
+X_train, X_test, y_train, y_test = train_test_split(df[best_columns_K], df['Class'], test_size=0.2, random_state=42)
+
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+
+accuracy = accuracy_score(y_test, y_pred)
+print("Accuracy:", accuracy)
+
+model_names = ['Random Forest', 'Support Vector Machine']
+accuracy_scores = [0.85714, 0.77380]
+plt.figure(figsize=(10, 6))
+plt.bar(model_names, accuracy_scores, color=['blue', 'green'])
+plt.xlabel('Model')
+plt.ylabel('Accuracy')
+plt.title('Accuracy Comparison of Different Models')
+plt.ylim([0, 1])
+plt.xticks(rotation=45, ha='right')
+plt.tight_layout()
+plt.show()
