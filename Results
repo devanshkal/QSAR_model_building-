@@ -1,0 +1,18 @@
+📈 Model Performance Results
+The QSAR models were evaluated using Random Forest (RF), Support Vector Machine (SVM), and a combined RF+SVM ensemble approach. Performance metrics for both training and testing datasets are summarized below:
+
+✅ Training Accuracy:
+Random Forest: 83.93%
+
+Support Vector Machine: 85.71%
+
+RF + SVM Ensemble: 84.52%
+
+🧪 Testing Accuracy:
+Random Forest: 77.38%
+
+Support Vector Machine: 73.21%
+
+RF + SVM Ensemble: 77.38%
+
+The ensemble method balanced the strengths of both individual models and achieved the highest generalization on the test data, matching the performance of RF while mitigating overfitting observed in training.
